@@ -100,9 +100,9 @@ def five_start_Arthas():
 
 
 if __name__ == "__main__":
-    dict = most_popular_monitor()
-    #dict = habr_python_articles()
-    for x in dict:
-        print(x + "\t" + str(dict[x]))
-    # print(dota_winners())
+    #dict = most_popular_monitor()
+    # dict = habr_python_articles()
+    # for x in dict:
+    #     print(x + "\t" + str(dict[x]))
+    print(dota_winners())
     # print(five_start_Arthas())
