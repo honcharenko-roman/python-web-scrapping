@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import date
 
 
+
 def soup_site(address, pageid=None):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.78 Safari/537.36 Vivaldi/2.8.1664.35'
@@ -159,8 +160,8 @@ if __name__ == "__main__":
     # dict = habr_python_articles('vue.js')
     # for x in dict:
     #     print(x + "\t" + str(dict[x]))
-    dict = dota_news('lil')
-    for x in dict:
-        print(x + str(dict[x]))
+    # dict = dota_news('lil')
+    # for x in dict:
+    #     print(x + str(dict[x]))
     # print(dota_radiant_winrate())
-    # print(five_start_Arthas())
+    print(five_start_Arthas())
