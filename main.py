@@ -5,16 +5,91 @@ from bs4 import BeautifulSoup
 from datetime import date
 
 
+def work_ua(keyword, city):
 
-def soup_site(address, pageid=None):
+    pageid = 1
+    works_dict = {
+
+    }
+    url = 'https://www.work.ua/jobs-' + city + '-' + keyword + '/?page='
+    while(True):
+        soup = soup_site(url, pageid=pageid)
+
+        headline_tag = soup.findAll('h2', {'class': 'add-bottom-sm'})
+        #headline_tag = headline_tag.findNext()
+        print(headline_tag[:])
+
+        #headline_tags = headline_tags_parent.find('a', recursive=False)
+        # if headline_tags:
+        #     for headline_tag in headline_tags:
+        #         print(headline_tag)
+        # if headline_tag['title'].lower().find('python') > 0:
+        #     print(headline_tag['title'])  # == 'add-bottom-sm':
+        # print(headline_tag)
+        # works_dict[headline_tag.contents[0]
+        #          ] = headline_tag['href']
+        pageid += 1
+    return works_dict
+
+
+def djinni(keyword, city):
+    pageid = 1
+    works_dict = {
+
+    }
+    url = 'https://djinni.co/jobs/?primary_keyword=' + keyword + '&page='
+    closer = '&location=' + city
+    while(True):
+        soup = soup_site(url, pageid=pageid, closer=closer)
+        headline_tags = soup.findAll(
+            'a', {'class': 'profile'})
+        if headline_tags:
+            for headline_tag in headline_tags:
+                works_dict[headline_tag.contents[0]
+                           ] = 'https://djinni.co/' + headline_tag['href']
+        else:
+            break
+        pageid += 1
+    return works_dict
+
+
+def rabota_ua(keyword, city=None):
+
+    works_dict = {
+    }
+
+    pageid = 1
+
+    if city is not None:
+        site_url = 'https://rabota.ua/zapros/' + keyword + '/' + city + '/pg'
+    else:
+        site_url = 'https://rabota.ua/zapros/' + keyword + '/pg'
+
+    while(True):
+        soup = soup_site(site_url, pageid)
+        headline_tags = soup.findAll(
+            'a', {'class': 'f-visited-enable ga_listing'})
+        if headline_tags:
+            for headline_tag in headline_tags:
+                works_dict[headline_tag['title']
+                           ] = 'https://rabota.ua' + headline_tag['href']
+        else:
+            break
+        pageid += 1
+    return works_dict
+
+
+def soup_site(address, pageid=None, closer=None):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.78 Safari/537.36 Vivaldi/2.8.1664.35'
     }
-    if pageid:
+    if pageid and closer:
+        url = '%s%s%s' % (address, pageid, closer)
+    elif pageid:
         url = '%s%s' % (address, pageid)
     else:
         url = address
-
+    print(url)
     response = requests.get(url, headers=headers)
     return BeautifulSoup(response.text, 'html.parser')
 
@@ -100,7 +175,8 @@ def habr_python_articles(find_value):
     for pageid in range(1, 10):
         soup = soup_site('https://habr.com/en/all/page', pageid=pageid)
         for headline_tag in soup.findAll('a', {'class': 'post__title_link'}):
-            result = str(headline_tag.contents).lower().find(find_value.lower())
+            result = str(headline_tag.contents).lower().find(
+                find_value.lower())
             if result > 0:
                 headline_link_dict[str(headline_tag.contents)
                                    ] = headline_tag['href']
@@ -156,12 +232,16 @@ def five_start_Arthas():
 
 
 if __name__ == "__main__":
+    city = 'Одесса'
+    keyword = 'Python'
+    work_ua('python', city='odesa')
+    # dict = rabota_ua('javascript', city='харьков')
     # dict = most_popular_monitor()
     # dict = habr_python_articles('vue.js')
+    # dict = dota_news('lil')
+    # dict = djinni('Python', 'Одесса')
     # for x in dict:
     #     print(x + "\t" + str(dict[x]))
-    # dict = dota_news('lil')
-    # for x in dict:
-    #     print(x + str(dict[x]))
+
     # print(dota_radiant_winrate())
-    print(five_start_Arthas())
+    # print(five_start_Arthas())
