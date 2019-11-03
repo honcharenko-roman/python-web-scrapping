@@ -1,8 +1,48 @@
 import requests
 import time
+import selenium
 
 from bs4 import BeautifulSoup
 from datetime import date
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+
+# TODO Async scrapping 
+# TODO City name parcing (work.ua , ...)
+
+
+def set_up_chrome_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--headless")
+    driver = webdriver.Chrome(options=chrome_options)
+    return driver
+
+
+def dou_jobs(keyword, city):
+    works_dict = {
+
+    }
+    
+    driver = set_up_chrome_driver()
+    url = 'https://jobs.dou.ua/vacancies/?city=' + city + '&category=' + keyword
+    driver.get(url)
+    try:
+        continue_link = driver.find_element_by_link_text('Больше вакансий')
+        while continue_link.is_displayed():
+            continue_link.click()
+            time.sleep(0.1)
+    except selenium.common.exceptions.NoSuchElementException:
+        print('eos')
+
+    html = driver.execute_script("return document.body.outerHTML;")
+    soup = BeautifulSoup(html, 'html.parser')
+    headline_tags = soup.findAll('a', {'class': 'vt'})
+    for headline_tag in headline_tags:
+        works_dict[headline_tag.contents[0]] = headline_tag['href']
+    return works_dict
 
 
 def work_ua(keyword, city):
@@ -12,22 +52,15 @@ def work_ua(keyword, city):
 
     }
     url = 'https://www.work.ua/jobs-' + city + '-' + keyword + '/?page='
-    while(True):
+
+    while True:
         soup = soup_site(url, pageid=pageid)
-
-        headline_tag = soup.findAll('h2', {'class': 'add-bottom-sm'})
-        #headline_tag = headline_tag.findNext()
-        print(headline_tag[:])
-
-        #headline_tags = headline_tags_parent.find('a', recursive=False)
-        # if headline_tags:
-        #     for headline_tag in headline_tags:
-        #         print(headline_tag)
-        # if headline_tag['title'].lower().find('python') > 0:
-        #     print(headline_tag['title'])  # == 'add-bottom-sm':
-        # print(headline_tag)
-        # works_dict[headline_tag.contents[0]
-        #          ] = headline_tag['href']
+        headline_tags = soup.findAll('h2', {'class': 'add-bottom-sm'})
+        if not headline_tags:
+            break
+        for headline_tag in headline_tags:
+            works_dict[headline_tag.find(
+                'a')['title']] = 'https://www.work.ua/' + headline_tag.find('a')['href']
         pageid += 1
     return works_dict
 
@@ -39,7 +72,7 @@ def djinni(keyword, city):
     }
     url = 'https://djinni.co/jobs/?primary_keyword=' + keyword + '&page='
     closer = '&location=' + city
-    while(True):
+    while True:
         soup = soup_site(url, pageid=pageid, closer=closer)
         headline_tags = soup.findAll(
             'a', {'class': 'profile'})
@@ -65,7 +98,7 @@ def rabota_ua(keyword, city=None):
     else:
         site_url = 'https://rabota.ua/zapros/' + keyword + '/pg'
 
-    while(True):
+    while True:
         soup = soup_site(site_url, pageid)
         headline_tags = soup.findAll(
             'a', {'class': 'f-visited-enable ga_listing'})
@@ -89,7 +122,6 @@ def soup_site(address, pageid=None, closer=None):
         url = '%s%s' % (address, pageid)
     else:
         url = address
-    print(url)
     response = requests.get(url, headers=headers)
     return BeautifulSoup(response.text, 'html.parser')
 
@@ -116,7 +148,7 @@ def dota_news(find_value):
         'дек': 12
     }
 
-    while(True):
+    while True:
         soup = soup_site('https://dota2.net/allnews?page=', pageid=pageid)
         time_tags = soup.select("div[class=news-item__statistics]")
 
@@ -126,6 +158,7 @@ def dota_news(find_value):
                 if published.find(month) >= 0:
                     published_date = date(
                         current_date.year, months_dict[month], int(published.split()[0]))
+
         if (current_date - published_date).days > 30:
             break
 
@@ -145,7 +178,8 @@ def dota_radiant_winrate():
     overall_games_count = 0
     pageid = 1
 
-    while (True):
+    while True:
+        print(pageid)
         soup = soup_site('https://www.dotabuff.com/esports/matches?page=',
                          pageid=pageid)
         headline_tags = soup.findAll(
@@ -178,7 +212,7 @@ def habr_python_articles(find_value):
             result = str(headline_tag.contents).lower().find(
                 find_value.lower())
             if result > 0:
-                headline_link_dict[str(headline_tag.contents)
+                headline_link_dict[str(headline_tag.contents[0])
                                    ] = headline_tag['href']
             else:
                 continue
@@ -200,7 +234,7 @@ def most_popular_monitor():
         'OTHER': 0
     }
     pageid = 0
-    # stupid stop
+    # TODO HARDCODED STOP RANGE
     for pageid in range(0, 600, 40):
         url = 'https://forum.overclockers.ua/viewforum.php?f=11&start=%d' % pageid
         response = requests.get(url)
@@ -217,7 +251,7 @@ def most_popular_monitor():
             if flag:
                 monitors_dict['OTHER'] += 1
         pageid += 1
-    # TODO return value by key
+
     return monitors_dict
 
 
@@ -227,19 +261,23 @@ def five_start_Arthas():
     for a in soup.findAll('a'):
         if a.parent.parent.name == 'tr':
             for _ in a.parent.parent.findAll('span', {'class': 'stars _5'}):
-                five_stars_shows.append(a.contents)
+                five_stars_shows.append(a.contents[0])
     return five_stars_shows
 
 
 if __name__ == "__main__":
-    city = 'Одесса'
+    city = 'Киев'
     keyword = 'Python'
-    work_ua('python', city='odesa')
-    # dict = rabota_ua('javascript', city='харьков')
-    # dict = most_popular_monitor()
-    # dict = habr_python_articles('vue.js')
-    # dict = dota_news('lil')
+
+    # dict = dou_jobs(keyword, city)
+    # dict = work_ua('python', city='kyiv')
+    # dict = rabota_ua('python', city='одесса')
     # dict = djinni('Python', 'Одесса')
+
+    # dict = most_popular_monitor()
+    # dict = habr_python_articles('python')
+    # dict = dota_news('v1lat')
+
     # for x in dict:
     #     print(x + "\t" + str(dict[x]))
 
