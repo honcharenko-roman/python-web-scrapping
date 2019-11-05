@@ -11,7 +11,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 
-# TODO Async scrapping
+# TODO Async scrapping (STOP RANGE)
 # TODO City name parcing (work.ua , ...)
 
 
@@ -68,29 +68,32 @@ def work_ua(keyword, city):
     return works_dict
 
 
-def djinni(keyword, city):
-    pageid = 1
+async def djinni_coroutine(works_dict, url, closer, pageid):
+    soup = await async_site_soup(url, pageid=pageid, closer=closer)
+    headline_tags = soup.findAll(
+        'a', {'class': 'profile'})
+    if headline_tags:
+        for headline_tag in headline_tags:
+            works_dict[headline_tag.contents[0]
+                        ] = 'https://djinni.co/' + headline_tag['href']
+    else:
+        return
+
+
+async def djinni(keyword, city):
     works_dict = {
 
     }
     url = 'https://djinni.co/jobs/?primary_keyword=' + keyword + '&page='
     closer = '&location=' + city
-    while True:
-        soup = sync_site_soup(url, pageid=pageid, closer=closer)
-        headline_tags = soup.findAll(
-            'a', {'class': 'profile'})
-        if headline_tags:
-            for headline_tag in headline_tags:
-                works_dict[headline_tag.contents[0]
-                           ] = 'https://djinni.co/' + headline_tag['href']
-        else:
-            break
-        pageid += 1
+    tasks = [
+        asyncio.create_task(djinni_coroutine(works_dict, url, closer, pageid)) for pageid in range(1, 20)
+    ]
+    await asyncio.wait(tasks)
     return works_dict
 
 
 async def rabota_ua_coroutine(works_dict, site_url, pageid):
-    #soup = await async_site_soup('https://habr.com/en/all/page', pageid=pageid)
     soup = await async_site_soup(site_url, pageid)
     headline_tags = soup.findAll(
         'a', {'class': 'f-visited-enable ga_listing'})
@@ -313,14 +316,15 @@ def main():
     # value = ioloop.run_until_complete(dota_radiant_winrate())
     # monitors = ioloop.run_until_complete(most_popular_monitor())
     # async_dota_news_dict = ioloop.run_until_complete(dota_news('lil'))
-    rabota_ua_dict = ioloop.run_until_complete(rabota_ua('java', city='киев'))
+    # rabota_ua_dict = ioloop.run_until_complete(rabota_ua('java', city='киев'))
+    djinni_dict = ioloop.run_until_complete(djinni('Python', 'Одесса'))
 
     #ioloop.close()
     #dota_news_dict = sync_dota_news('lil')
     #print(len(rabota_ua_dict))
 
-    for x in rabota_ua_dict:
-        print(x + "\t" + str(rabota_ua_dict[x]))
+    for x in djinni_dict:
+        print(x + "\t" + str(djinni_dict[x]))
 
     # dict = dota_news('v1lat')
 
