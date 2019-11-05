@@ -85,6 +85,7 @@ def dou_jobs(keyword, city):
     url = 'https://jobs.dou.ua/vacancies/?city=' + city + '&category=' + keyword
     driver.get(url)
     try:
+        time.sleep(0.1)
         continue_link = driver.find_element_by_link_text('Больше вакансий')
         while continue_link.is_displayed():
             continue_link.click()

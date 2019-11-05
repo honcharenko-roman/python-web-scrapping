@@ -12,7 +12,7 @@ def set_up_chrome_driver():
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver.Chrome("/usr/lib/chromium-browser/chromedriver", options=chrome_options)
     return driver
 
 def sync_site_soup(address, pageid=None, closer=None):
