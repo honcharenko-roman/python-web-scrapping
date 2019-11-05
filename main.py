@@ -48,23 +48,25 @@ def dou_jobs(keyword, city):
     return works_dict
 
 
-def work_ua(keyword, city):
+async def work_ua_coroutine(works_dict, url, pageid):
+    soup = await async_site_soup(url, pageid=pageid)
+    headline_tags = soup.findAll('h2', {'class': 'add-bottom-sm'})
+    if not headline_tags:
+        return 
+    for headline_tag in headline_tags:
+        works_dict[headline_tag.find(
+            'a')['title']] = 'https://www.work.ua' + headline_tag.find('a')['href']
 
-    pageid = 1
+
+async def work_ua(keyword, city):
     works_dict = {
 
     }
     url = 'https://www.work.ua/jobs-' + city + '-' + keyword + '/?page='
-
-    while True:
-        soup = sync_site_soup(url, pageid=pageid)
-        headline_tags = soup.findAll('h2', {'class': 'add-bottom-sm'})
-        if not headline_tags:
-            break
-        for headline_tag in headline_tags:
-            works_dict[headline_tag.find(
-                'a')['title']] = 'https://www.work.ua/' + headline_tag.find('a')['href']
-        pageid += 1
+    tasks = [
+        asyncio.create_task(work_ua_coroutine(works_dict, url, pageid)) for pageid in range(1, 20)
+    ]
+    await asyncio.wait(tasks)
     return works_dict
 
 
@@ -317,14 +319,15 @@ def main():
     # monitors = ioloop.run_until_complete(most_popular_monitor())
     # async_dota_news_dict = ioloop.run_until_complete(dota_news('lil'))
     # rabota_ua_dict = ioloop.run_until_complete(rabota_ua('java', city='киев'))
-    djinni_dict = ioloop.run_until_complete(djinni('Python', 'Одесса'))
+    # djinni_dict = ioloop.run_until_complete(djinni('Python', 'Одесса'))
+    work_ua_dict = ioloop.run_until_complete(work_ua('python', city='odesa'))
 
     #ioloop.close()
     #dota_news_dict = sync_dota_news('lil')
     #print(len(rabota_ua_dict))
 
-    for x in djinni_dict:
-        print(x + "\t" + str(djinni_dict[x]))
+    for x in work_ua_dict:
+        print(x + "\t" + str(work_ua_dict[x]))
 
     # dict = dota_news('v1lat')
 
