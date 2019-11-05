@@ -1,236 +1,22 @@
-import requests
 import time
-import selenium
 import asyncio
-import aiohttp
-import html5lib
+
+
+from datetime import date
+
+import wstools
+import works
+import dota
 
 from bs4 import BeautifulSoup
-from datetime import date
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 
 
 # TODO Async scrapping (STOP RANGE)
 # TODO City name parcing (work.ua , ...)
 
 
-def set_up_chrome_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
-
-
-def dou_jobs(keyword, city):
-    works_dict = {
-
-    }
-
-    driver = set_up_chrome_driver()
-    url = 'https://jobs.dou.ua/vacancies/?city=' + city + '&category=' + keyword
-    driver.get(url)
-    try:
-        continue_link = driver.find_element_by_link_text('Больше вакансий')
-        while continue_link.is_displayed():
-            continue_link.click()
-            time.sleep(0.1)
-    except selenium.common.exceptions.NoSuchElementException:
-        print('eos')
-
-    html = driver.execute_script("return document.body.outerHTML;")
-    soup = BeautifulSoup(html, 'html.parser')
-    headline_tags = soup.findAll('a', {'class': 'vt'})
-    for headline_tag in headline_tags:
-        works_dict[headline_tag.contents[0]] = headline_tag['href']
-    return works_dict
-
-
-async def work_ua_coroutine(works_dict, url, pageid):
-    soup = await async_site_soup(url, pageid=pageid)
-    headline_tags = soup.findAll('h2', {'class': 'add-bottom-sm'})
-    if not headline_tags:
-        return 
-    for headline_tag in headline_tags:
-        works_dict[headline_tag.find(
-            'a')['title']] = 'https://www.work.ua' + headline_tag.find('a')['href']
-
-
-async def work_ua(keyword, city):
-    works_dict = {
-
-    }
-    url = 'https://www.work.ua/jobs-' + city + '-' + keyword + '/?page='
-    tasks = [
-        asyncio.create_task(work_ua_coroutine(works_dict, url, pageid)) for pageid in range(1, 20)
-    ]
-    await asyncio.wait(tasks)
-    return works_dict
-
-
-async def djinni_coroutine(works_dict, url, closer, pageid):
-    soup = await async_site_soup(url, pageid=pageid, closer=closer)
-    headline_tags = soup.findAll(
-        'a', {'class': 'profile'})
-    if headline_tags:
-        for headline_tag in headline_tags:
-            works_dict[headline_tag.contents[0]
-                        ] = 'https://djinni.co/' + headline_tag['href']
-    else:
-        return
-
-
-async def djinni(keyword, city):
-    works_dict = {
-
-    }
-    url = 'https://djinni.co/jobs/?primary_keyword=' + keyword + '&page='
-    closer = '&location=' + city
-    tasks = [
-        asyncio.create_task(djinni_coroutine(works_dict, url, closer, pageid)) for pageid in range(1, 20)
-    ]
-    await asyncio.wait(tasks)
-    return works_dict
-
-
-async def rabota_ua_coroutine(works_dict, site_url, pageid):
-    soup = await async_site_soup(site_url, pageid)
-    headline_tags = soup.findAll(
-        'a', {'class': 'f-visited-enable ga_listing'})
-    if headline_tags:
-        for headline_tag in headline_tags:
-            works_dict[headline_tag['title']
-                        ] = 'https://rabota.ua' + headline_tag['href']
-    else:
-        return
-
-
-# TODO range
-async def rabota_ua(keyword, city=None):
-    works_dict = {
-    }
-    if city is not None:
-        site_url = 'https://rabota.ua/zapros/' + keyword + '/' + city + '/pg'
-    else:
-        site_url = 'https://rabota.ua/zapros/' + keyword + '/pg'
-    tasks = [
-        asyncio.create_task(rabota_ua_coroutine(works_dict, site_url, pageid)) for pageid in range(1, 20)
-    ]
-    await asyncio.wait(tasks)
-    return works_dict
-
-
-def sync_site_soup(address, pageid=None, closer=None):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.78 Safari/537.36 Vivaldi/2.8.1664.35'
-    }
-    if pageid and closer:
-        url = '%s%s%s' % (address, pageid, closer)
-    elif pageid:
-        url = '%s%s' % (address, pageid)
-    else:
-        url = address
-    response = requests.get(url, headers=headers)
-    return BeautifulSoup(response.text, 'html.parser')
-
-
-async def async_site_soup(address, pageid=None, closer=None):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.78 Safari/537.36 Vivaldi/2.8.1664.35'
-    }
-    if pageid and closer:
-        url = '%s%s%s' % (address, pageid, closer)
-    elif pageid:
-        url = '%s%s' % (address, pageid)
-    else:
-        url = address
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as resp:
-            text = await resp.read()
-
-    return BeautifulSoup(text.decode('utf-8'), 'html5lib')
-
-
-async def dota_news_coroutine(news_dict, months_dict, find_value, pageid):
-    current_date = published_date = date.today()
-    soup = await async_site_soup('https://dota2.net/allnews?page=', pageid=pageid)
-    time_tags = soup.select("div[class=news-item__statistics]")
-
-    for time_tag in time_tags:
-        published = time_tag.contents[0]
-        for month in months_dict:
-            if published.find(month) >= 0:
-                published_date = date(
-                    current_date.year, months_dict[month], int(published.split()[0]))
-
-    if (current_date - published_date).days > 30:
-        return 
-
-    headline_tags = soup.findAll(
-        'a', {'class': 'news-item__title'})
-    for headline_tag in headline_tags:
-        title = str(headline_tag.contents[0])
-        if title.lower().find(find_value.lower()) >= 0:
-            news_dict[headline_tag.contents[0]] = headline_tag['href']
-
-#TODO RANGE!
-async def dota_news(find_value):
-    news_dict = {
-    }
-    months_dict = {
-        'янв': 1,
-        'фев': 2,
-        'мар': 3,
-        'апр': 4,
-        'мая': 5,
-        'июн': 6,
-        'июл': 7,
-        'авг': 8,
-        'сен': 9,
-        'окт': 10,
-        'нояб': 11,
-        'дек': 12
-    }
-    tasks = [
-        asyncio.create_task(dota_news_coroutine(news_dict, months_dict, find_value, pageid)) for pageid in range(1, 27)
-    ]
-    await asyncio.wait(tasks)
-    return news_dict
-
-
-async def dota_winners_coroutine(radiant_winners, overall_games, pageid):
-    soup = await async_site_soup('https://www.dotabuff.com/esports/matches?page=',
-                                 pageid=pageid)
-    headline_tags = soup.findAll(
-        'span', {'class': 'team-text team-text-full'})
-
-    if not headline_tags:
-        return
-
-    for headline_tag in headline_tags:
-        if str(headline_tag.parent.parent['class']).find('radiant') > 0 \
-                and str(headline_tag.parent.parent.parent['class']).find('winner') > 0:
-            radiant_winners.append(1)
-    overall_games.append(20)
-
-
-# TODO STOP RANGE mb flag!
-async def dota_radiant_winrate():
-    radiant_winners = []
-    overall_games = []
-
-    tasks = [
-        asyncio.create_task(dota_winners_coroutine(radiant_winners, overall_games, i)) for i in range(1, 50)
-    ]
-    await asyncio.wait(tasks)
-
-    return sum(radiant_winners) / sum(overall_games)
-
-
 async def habr_coroutine(headline_link_dict, pageid, find_value):
-    soup = await async_site_soup('https://habr.com/en/all/page', pageid=pageid)
+    soup = await wstools.async_site_soup('https://habr.com/en/all/page', pageid=pageid)
     for headline_tag in soup.findAll('a', {'class': 'post__title_link'}):
         result = str(headline_tag.contents).lower().find(
             find_value.lower())
@@ -253,7 +39,7 @@ async def habr_python_articles(find_value):
 
 
 async def monitor_coroutine(monitors_dict, pageid):
-    soup = await async_site_soup(
+    soup = await wstools.async_site_soup(
         'https://forum.overclockers.ua/viewforum.php?f=11&start=', pageid=pageid)
     headline_tags = soup.findAll('a', {'class': 'topictitle'})
 
@@ -294,8 +80,9 @@ async def most_popular_monitor():
     return monitors_dict
 
 
+#no sense to async
 def five_stars_Arthas():
-    soup = sync_site_soup('https://myshows.me/AI_Avenger/wasted')
+    soup = wstools.sync_site_soup('https://myshows.me/AI_Avenger/wasted')
     five_stars_shows = []
     for a in soup.findAll('a'):
         if a.parent.parent.name == 'tr':
@@ -305,33 +92,24 @@ def five_stars_Arthas():
 
 
 def main():
-    #city = 'Киев'
-    #keyword = 'Python'
+    city = 'Киев'
+    keyword = 'Python'
 
-    # dict = dou_jobs(keyword, city)
-    # dict = work_ua('python', city='kyiv')
-    # dict = rabota_ua('python', city='одесса')
-    # dict = djinni('Python', 'Одесса')
+    dict = works.dou_jobs(keyword, city)
 
     ioloop = asyncio.get_event_loop()
     # articles = ioloop.run_until_complete(habr_python_articles('python'))
-    # value = ioloop.run_until_complete(dota_radiant_winrate())
+    # value = ioloop.run_until_complete(dota.dota_radiant_winrate())
     # monitors = ioloop.run_until_complete(most_popular_monitor())
-    # async_dota_news_dict = ioloop.run_until_complete(dota_news('lil'))
-    # rabota_ua_dict = ioloop.run_until_complete(rabota_ua('java', city='киев'))
-    # djinni_dict = ioloop.run_until_complete(djinni('Python', 'Одесса'))
-    work_ua_dict = ioloop.run_until_complete(work_ua('python', city='odesa'))
+    # async_dota_news_dict = ioloop.run_until_complete(dota.dota_news('lil'))
+    # rabota_ua_dict = ioloop.run_until_complete(works.rabota_ua('java', city='киев'))
+    # djinni_dict = ioloop.run_until_complete(works.djinni('Python', 'Одесса'))
+    # work_ua_dict = ioloop.run_until_complete(works.work_ua('python', city='odesa'))
 
     #ioloop.close()
-    #dota_news_dict = sync_dota_news('lil')
-    #print(len(rabota_ua_dict))
+    for x in dict:
+        print(x + "\t" + str(dict[x]))
 
-    for x in work_ua_dict:
-        print(x + "\t" + str(work_ua_dict[x]))
-
-    # dict = dota_news('v1lat')
-
-    # print(dota_radiant_winrate())
     # print(five_start_Arthas())
 
 
