@@ -89,29 +89,31 @@ def djinni(keyword, city):
     return works_dict
 
 
-def rabota_ua(keyword, city=None):
+async def rabota_ua_coroutine(works_dict, site_url, pageid):
+    #soup = await async_site_soup('https://habr.com/en/all/page', pageid=pageid)
+    soup = await async_site_soup(site_url, pageid)
+    headline_tags = soup.findAll(
+        'a', {'class': 'f-visited-enable ga_listing'})
+    if headline_tags:
+        for headline_tag in headline_tags:
+            works_dict[headline_tag['title']
+                        ] = 'https://rabota.ua' + headline_tag['href']
+    else:
+        return
 
+
+# TODO range
+async def rabota_ua(keyword, city=None):
     works_dict = {
     }
-
-    pageid = 1
-
     if city is not None:
         site_url = 'https://rabota.ua/zapros/' + keyword + '/' + city + '/pg'
     else:
         site_url = 'https://rabota.ua/zapros/' + keyword + '/pg'
-
-    while True:
-        soup = sync_site_soup(site_url, pageid)
-        headline_tags = soup.findAll(
-            'a', {'class': 'f-visited-enable ga_listing'})
-        if headline_tags:
-            for headline_tag in headline_tags:
-                works_dict[headline_tag['title']
-                           ] = 'https://rabota.ua' + headline_tag['href']
-        else:
-            break
-        pageid += 1
+    tasks = [
+        asyncio.create_task(rabota_ua_coroutine(works_dict, site_url, pageid)) for pageid in range(1, 20)
+    ]
+    await asyncio.wait(tasks)
     return works_dict
 
 
@@ -146,13 +148,32 @@ async def async_site_soup(address, pageid=None, closer=None):
     return BeautifulSoup(text.decode('utf-8'), 'html5lib')
 
 
-def dota_news(find_value):
-    pageid = 1
+async def dota_news_coroutine(news_dict, months_dict, find_value, pageid):
     current_date = published_date = date.today()
+    soup = await async_site_soup('https://dota2.net/allnews?page=', pageid=pageid)
+    time_tags = soup.select("div[class=news-item__statistics]")
+
+    for time_tag in time_tags:
+        published = time_tag.contents[0]
+        for month in months_dict:
+            if published.find(month) >= 0:
+                published_date = date(
+                    current_date.year, months_dict[month], int(published.split()[0]))
+
+    if (current_date - published_date).days > 30:
+        return 
+
+    headline_tags = soup.findAll(
+        'a', {'class': 'news-item__title'})
+    for headline_tag in headline_tags:
+        title = str(headline_tag.contents[0])
+        if title.lower().find(find_value.lower()) >= 0:
+            news_dict[headline_tag.contents[0]] = headline_tag['href']
+
+#TODO RANGE!
+async def dota_news(find_value):
     news_dict = {
-
     }
-
     months_dict = {
         'янв': 1,
         'фев': 2,
@@ -167,35 +188,16 @@ def dota_news(find_value):
         'нояб': 11,
         'дек': 12
     }
-
-    while True:
-        soup = sync_site_soup('https://dota2.net/allnews?page=', pageid=pageid)
-        time_tags = soup.select("div[class=news-item__statistics]")
-
-        for time_tag in time_tags:
-            published = time_tag.contents[0]
-            for month in months_dict:
-                if published.find(month) >= 0:
-                    published_date = date(
-                        current_date.year, months_dict[month], int(published.split()[0]))
-
-        if (current_date - published_date).days > 30:
-            break
-
-        headline_tags = soup.findAll(
-            'a', {'class': 'news-item__title'})
-        for headline_tag in headline_tags:
-            title = str(headline_tag.contents[0])
-            if title.lower().find(find_value.lower()) >= 0:
-                news_dict[headline_tag.contents[0]] = headline_tag['href']
-
-        pageid += 1
+    tasks = [
+        asyncio.create_task(dota_news_coroutine(news_dict, months_dict, find_value, pageid)) for pageid in range(1, 27)
+    ]
+    await asyncio.wait(tasks)
     return news_dict
 
 
 async def dota_winners_coroutine(radiant_winners, overall_games, pageid):
     soup = await async_site_soup('https://www.dotabuff.com/esports/matches?page=',
-                            pageid=pageid)
+                                 pageid=pageid)
     headline_tags = soup.findAll(
         'span', {'class': 'team-text team-text-full'})
 
@@ -209,7 +211,7 @@ async def dota_winners_coroutine(radiant_winners, overall_games, pageid):
     overall_games.append(20)
 
 
-#TODO STOP RANGE mb flag!
+# TODO STOP RANGE mb flag!
 async def dota_radiant_winrate():
     radiant_winners = []
     overall_games = []
@@ -245,9 +247,29 @@ async def habr_python_articles(find_value):
     return headline_link_dict
 
 
-def most_popular_monitor():
+async def monitor_coroutine(monitors_dict, pageid):
+    soup = await async_site_soup(
+        'https://forum.overclockers.ua/viewforum.php?f=11&start=', pageid=pageid)
+    headline_tags = soup.findAll('a', {'class': 'topictitle'})
+
+    if soup.find('li', {'class': 'next'}) is None:
+        return
+
+    for headline_tag in headline_tags:
+        flag = False
+        for monitor in monitors_dict:
+            result = str(headline_tag.contents).upper().find(monitor)
+            if result > 0:
+                monitors_dict[monitor] += 1
+                flag = True
+                break
+        if flag:
+            monitors_dict['OTHER'] += 1
+
+
+async def most_popular_monitor():
     monitors_dict = {
-        'MSI': 0,
+        'MSI': 0, 
         'DELL': 0,
         'SAMSUNG': 0,
         'AOC': 0,
@@ -259,28 +281,11 @@ def most_popular_monitor():
         'PHILIPS': 0,
         'OTHER': 0
     }
-    pageid = 0
-    while True:
 
-        soup = sync_site_soup(
-            'https://forum.overclockers.ua/viewforum.php?f=11&start=', pageid=pageid)
-        headline_tags = soup.findAll('a', {'class': 'topictitle'})
-
-        if soup.find('li', {'class': 'next'}) is None:
-            break
-
-        for headline_tag in headline_tags:
-            flag = False
-            for monitor in monitors_dict:
-                result = str(headline_tag.contents).upper().find(monitor)
-                if result > 0:
-                    monitors_dict[monitor] += 1
-                    flag = True
-                    break
-            if flag:
-                monitors_dict['OTHER'] += 1
-        pageid += 40
-
+    tasks = [
+        asyncio.create_task(monitor_coroutine(monitors_dict, i)) for i in range(1, 600, 40)
+    ]
+    await asyncio.wait(tasks)
     return monitors_dict
 
 
@@ -298,30 +303,29 @@ def main():
     #city = 'Киев'
     #keyword = 'Python'
 
-    # five_stars_Arthas()
-    # five_stars_Arthas()
-
     # dict = dou_jobs(keyword, city)
     # dict = work_ua('python', city='kyiv')
     # dict = rabota_ua('python', city='одесса')
     # dict = djinni('Python', 'Одесса')
 
-    #dict = most_popular_monitor()
     ioloop = asyncio.get_event_loop()
-    #articles = ioloop.run_until_complete(habr_python_articles('python'))
-    value = ioloop.run_until_complete(dota_radiant_winrate())
-    ioloop.close()
-    print(value)
+    # articles = ioloop.run_until_complete(habr_python_articles('python'))
+    # value = ioloop.run_until_complete(dota_radiant_winrate())
+    # monitors = ioloop.run_until_complete(most_popular_monitor())
+    # async_dota_news_dict = ioloop.run_until_complete(dota_news('lil'))
+    rabota_ua_dict = ioloop.run_until_complete(rabota_ua('java', city='киев'))
 
+    #ioloop.close()
+    #dota_news_dict = sync_dota_news('lil')
+    #print(len(rabota_ua_dict))
 
-    # for x in articles:
-    #     print(x + "\t" + str(articles[x]))
+    for x in rabota_ua_dict:
+        print(x + "\t" + str(rabota_ua_dict[x]))
 
     # dict = dota_news('v1lat')
 
     # print(dota_radiant_winrate())
     # print(five_start_Arthas())
-
 
 
 if __name__ == "__main__":
